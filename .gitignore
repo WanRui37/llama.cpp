@@ -43,6 +43,7 @@ lcov-report/
 tags
 .build/
 build*
+!build-info-gen-cpp.cmake
 !build-info.cmake
 !build-info.cpp.in
 !build-info.sh
