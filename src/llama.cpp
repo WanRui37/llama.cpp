@@ -4508,6 +4508,30 @@ struct llama_model_loader {
             #if defined(GGML_NAME_DEBUG)
                 LLAMA_LOG_INFO("处理张量: %s\n", cur->name);
                 tensor_count++;
+
+                // if (cur->name && std::string(cur->name).find("blk.0.attn_output.weight") != std::string::npos) {
+                //     LLAMA_LOG_INFO("=== 打印目标张量: %s ===\n", cur->name);
+                //     LLAMA_LOG_INFO("张量类型: %s\n", ggml_type_name(cur->type));
+                //     int64_t n_elem = ggml_nelements(cur);
+
+                //     if (cur->type == GGML_TYPE_F32) {
+                //         float * data = (float*)cur->data;
+                //         for (int64_t i = 0; i < n_elem; i++) {
+                //             printf("%f ", data[i]);
+                //             if ((i+1) % 16 == 0) printf("\n");
+                //         }
+                //     } else if (cur->type == GGML_TYPE_F16) {
+                //         ggml_fp16_t * data = (ggml_fp16_t*)cur->data;
+                //         for (int64_t i = 0; i < n_elem; i++) {
+                //             printf("%f ", ggml_fp16_to_fp32(data[i]));
+                //             if ((i+1) % 16 == 0) printf("\n");
+                //         }
+                //     } else {
+                //         LLAMA_LOG_INFO("不支持的张量类型: %s\n", ggml_type_name(cur->type));
+                //     }
+
+                //     LLAMA_LOG_INFO("=== 目标张量打印结束 ===\n");
+                // }
             #endif 
         }
         #if defined(GGML_NAME_DEBUG)

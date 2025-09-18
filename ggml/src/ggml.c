@@ -1,7 +1,8 @@
-#define GGML_NAME_DEBUG
+// #define GGML_NAME_DEBUG
 #define _CRT_SECURE_NO_DEPRECATE // Disables ridiculous "unsafe" warnings on Windows
 #define _USE_MATH_DEFINES // For M_PI on MSVC
 // #define GGML_NAN_DEBUG
+// #define GGML_1BIT_HALF_FAULT_DEBUG
 
 #include "ggml-backend.h"
 #include "ggml-impl.h"
@@ -12583,15 +12584,35 @@ static void ggml_compute_forward_mul_mat_one_chunk(
                 for (int64_t ir0 = iir0; ir0 < iir0 + blck_0 && ir0 < ir0_end; ir0 += num_rows_per_vec_dot) {
                     if (src0->type == GGML_TYPE_I2_S) {
                         vec_dot(ne00, &tmp[ir0 - iir0], (num_rows_per_vec_dot > 1 ? 16 : 0), src0_row + ir0 * nb01 / 4, (num_rows_per_vec_dot > 1 ? nb01 : 0), src1_col_de, (num_rows_per_vec_dot > 1 ? src1_col_stride : 0), num_rows_per_vec_dot);
+                        
+                        // #if defined(GGML_1BIT_HALF_FAULT_DEBUG)
+                        //     if (dst->name && strstr(dst->name, "kqv_out-0" )
+                        //         && ir0 <100 && ir1 ==0 && i2 ==0 && i3 ==0 ) {
+                        //         printf("[tmp_origin[%ld]] = %.6f | ne00 = %ld | ne01 = %ld | "
+                        //             "ir0=%ld, ir1=%ld, i2=%ld, i3=%ld\n", 
+                        //             ir0 - iir0, tmp[ir0 - iir0] - act_sums[i1], ne00, ne01, ir0, ir1, i2, i3);
+                        //     }
+                        // #endif
+
                         tmp[ir0 - iir0] = (tmp[ir0 - iir0]  - act_sums[i1]) / (act_scales[i1]) * (*scale);
                     } else if (src0->type == GGML_TYPE_Q1A) {
                         vec_dot(ne00, &tmp[ir0 - iir0], (num_rows_per_vec_dot > 1 ? 16 : 0), src0_row + ir0 * nb01 / 8, (num_rows_per_vec_dot > 1 ? nb01 : 0), src1_col_de, (num_rows_per_vec_dot > 1 ? src1_col_stride : 0), num_rows_per_vec_dot);
+                        
+                        // #if defined(GGML_1BIT_HALF_FAULT_DEBUG)
+                        //     if (dst->name && strstr(dst->name, "kqv_out-0" )
+                        //         && ir0 <100 && ir1 ==0 && i2 ==0 && i3 ==0) {
+                        //         printf("[tmp_origin[%ld]] = %.6f | ne00 = %ld | ne01 = %ld | "
+                        //             "ir0=%ld, ir1=%ld, i2=%ld, i3=%ld\n", 
+                        //             ir0 - iir0, tmp[ir0 - iir0], ne00, ne01, ir0, ir1, i2, i3);
+                        //     }
+                        // #endif
+
                         tmp[ir0 - iir0] = (tmp[ir0 - iir0] ) / (act_scales[i1]) * (*scale_q1a);
                     } else {
                         vec_dot(ne00, &tmp[ir0 - iir0], (num_rows_per_vec_dot > 1 ? 16 : 0), src0_row + ir0 * nb01, (num_rows_per_vec_dot > 1 ? nb01 : 0), src1_col, (num_rows_per_vec_dot > 1 ? src1_col_stride : 0), num_rows_per_vec_dot);
                     }
 
-                    #ifdef GGML_NAN_DEBUG
+                    #if defined(GGML_NAN_DEBUG)  || defined(GGML_1BIT_HALF_FAULT_DEBUG)
                         if (isnan(tmp[ir0 - iir0])) {
                             fprintf(stderr, "Found NaN or -NaN in tmp at index %ld\n", ir0 - iir0);
                             exit(EXIT_FAILURE);
@@ -12600,6 +12621,23 @@ static void ggml_compute_forward_mul_mat_one_chunk(
                     // #ifdef GGML_NAN_DEBUG
                     //     printf("(i1 * nb1 + i2 * nb2 + i3 * nb3): %ld\n", (i1 * nb1 + i2 * nb2 + i3 * nb3));
                     // #endif
+                    #if defined(GGML_1BIT_HALF_FAULT_DEBUG)
+                        if (dst->name && (strstr(dst->name, "kqv_out-0") || strstr(dst->name, "Qcur-0"))
+                            && ir0 ==0 && ir1 <100 && i2 <100 && i3 ==0) {
+                            printf("[kqv_out-0] Processing: ir0=%ld, ir1=%ld, i2=%ld, i3=%ld\n", 
+                                ir0, ir1, i2, i3);
+                            printf("  tmp[%ld] = %.6f (raw dot: %.6f, act_sum: %.6f, act_scale: %.6f, scale: %.6f)\n",
+                                ir0 - iir0,
+                                tmp[ir0 - iir0],
+                                tmp[ir0 - iir0] * act_scales[i1] / (src0->type == GGML_TYPE_Q1A ? *scale_q1a : *scale) + act_sums[i1],
+                                (float)act_sums[i1],
+                                act_scales[i1],
+                                (src0->type == GGML_TYPE_Q1A ? *scale_q1a : *scale));
+                            printf("  Writing to dst_col[%ld] = %.6f\n", 
+                                ir0 - iir0, dst_col[ir0 - iir0]);
+                            printf("----------------------------------------\n");
+                        }
+                    #endif
                 }
 
                 // #ifdef GGML_NAN_DEBUG
@@ -13302,6 +13340,11 @@ UseGgmlGemm1:;
                 for (int64_t i11 = i11_processed + ith; i11 < ne11; i11 += nth) {
                     if (src0->type == GGML_TYPE_I2_S || src0->type == GGML_TYPE_Q1A) {
                         quantize_row_i8_s((float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11), (void *) (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1), ne10, act_scales + i11, act_sums + i11);
+                        #if defined (GGML_1BIT_HALF_FAULT_DEBUG)
+                            if (src0->name && src1->name && abs(act_sums[i11]) > 65536) {  // 修正为访问数组元素值
+                                printf("Warning: %s and %s crossing the line | ne10: %ld\n", src0->name, src1->name, ne10);
+                            }
+                        #endif
                     } else {
                         from_float((float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11),
                         (void *)               (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1),
@@ -13483,7 +13526,7 @@ UseGgmlGemm2:;
         }
         if (strcmp(dst->name, "kq-0") == 0) {
             size_t dst_len = dst->ne[0] * dst->ne[1] * dst->ne[2] * dst->ne[3];
-            const char* base_path = "/home/ic611/workspace/wr/LLM/BitNet_2025_04_24/logs_output/";
+            const char* base_path = "/home/ic611/workspace/wr/LLM/BitNet_opt_private/logs_output/";
             char file_name[256] = {0}; 
 
             const char* tensor_name = dst->name ? dst->name : "unknown_tensor";

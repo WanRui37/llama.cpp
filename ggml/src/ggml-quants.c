@@ -3517,6 +3517,9 @@ void quantize_row_i8_s(const float * x, void * y, int64_t n, float* act_scales, 
         dst[i] = (int8_t)(v);
     }
     act_sums[0] = sum;
+    // if (abs(sum) > 65536) {
+    //     printf("Warning | sum: %d\n", sum);
+    // }
 }
 
 // #define QK_I2 128

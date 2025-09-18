@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <inttypes.h>
 
 // 扩展参数结构体：新增目标张量名称参数
 struct common_params_ext : common_params {
